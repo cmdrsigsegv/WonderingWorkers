@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ricochet</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section id="lobby" hidden>
+    <div class="card">
+      <h1>Ricochet</h1>
+      <p class="muted" id="lobby-note">Race your friends to the shortest robot path.</p>
+      <label>Your name
+        <input id="name" maxlength="16" autocomplete="nickname" placeholder="Name">
+      </label>
+      <div id="lobby-create">
+        <label class="check">Quadrants with diagonal walls
+          <select id="opt-diag"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        </label>
+        <label class="check"><input type="checkbox" id="opt-white"> White robot that passes through diagonals</label>
+        <button id="create" class="primary">Create a room</button>
+        <div class="or">or join one</div>
+        <div class="row">
+          <input id="code" maxlength="5" placeholder="Code" autocapitalize="characters">
+          <button id="join">Join</button>
+        </div>
+      </div>
+      <div id="lobby-join" hidden>
+        <button id="join-hash" class="primary">Join room</button>
+      </div>
+      <p class="error" id="lobby-error"></p>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <header>
+      <div class="room">Room <b id="room-code"></b></div>
+      <button id="copy-link" class="small">Copy invite link</button>
+      <button id="new-board" class="small">New board</button>
+      <span id="new-board-menu" hidden>
+        <label class="muted">Diagonal quadrants
+          <select id="nb-diag"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        </label>
+        <label class="muted"><input type="checkbox" id="nb-white"> White robot</label>
+        <button class="small primary" data-newboard="start">Start new board</button>
+        <button class="small" data-newboard="cancel">Cancel</button>
+      </span>
+      <span id="board-kind" class="muted"></span>
+      <span id="mode" class="muted"></span>
+    </header>
+    <main>
+      <div class="board-wrap"><canvas id="board"></canvas></div>
+      <aside class="panel" id="panel">
+        <div id="status"></div>
+        <div class="timer"><div id="timer-bar"></div></div>
+        <div id="action"></div>
+        <div id="calls"></div>
+        <div id="scores"></div>
+      </aside>
+    </main>
+  </section>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

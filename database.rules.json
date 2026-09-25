@@ -1,0 +1,27 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        ".read": true,
+        ".write": "$room.matches(/^[A-Z0-9]{5}$/)",
+        "game": {
+          "rounds": {
+            "$round": {
+              "bids": {
+                "$bid": {
+                  ".validate": "!data.exists() && newData.hasChildren(['uid', 'n', 't'])",
+                  "uid": { ".validate": "newData.isString() && newData.val().length <= 32" },
+                  "n": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 99" },
+                  "t": { ".validate": "newData.val() == now" },
+                  "$other": { ".validate": false }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
