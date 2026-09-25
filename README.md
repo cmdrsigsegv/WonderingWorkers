@@ -1,13 +1,13 @@
-# Ricochet
+# Wondering Workers
 
-A browser version of Ricochet Robots for playing with friends online. It is a
+A browser inspired version of "Ricochet robots". It is a
 static website. Firebase Realtime Database keeps the calls, the timer, and the
 moves in sync between players.
 
 ## How a round works
 
 1. A target is drawn. Everyone looks for the shortest path that brings the
-   robot of that color onto it. Any robot may move, including the black one
+   worker of that color onto it. Any worker may move, including the black one
    and the optional white one, which have no targets of their own.
 2. You call a number by tapping it on the number pad. On a keyboard you can
    type the number and press Enter. The pad starts at 5, since shorter
@@ -22,17 +22,17 @@ moves in sync between players.
    seconds later, so nobody has to wait the full minute. If they take the 5
    back, the normal timer applies again.
 6. When the timer runs out, the lowest call shows their moves. Ties go to
-   whoever made that call first. They drag robots on the board, and everyone
+   whoever made that call first. They drag workers on the board, and everyone
    else watches the moves happen live.
 7. Reaching the target within the called number of moves wins the token. If
-   they give up, the robots go back and the next caller tries.
+   they give up, the workers go back and the next caller tries.
 8. If only one person called, they take the token as long as they reach the
    target, even if they miscounted in either direction. The exception is a
    single call of 5 that turns out to need more moves. That call cut
    everyone's timer short, so nobody scores and the target goes back in the
    pile. If it was the last target that could still be played, the caller
    keeps the token.
-9. The robots stay where they ended after a win.
+9. The workers stay where they ended after a win.
 
 Targets that can be reached in 4 moves or fewer are never drawn. The game ends
 when all 16 targets are won, or when every target that is left can be reached
@@ -43,14 +43,14 @@ in 4 moves or fewer.
 The multicolor swirl appears twice on the board. The two swirls are the two
 ends of a portal.
 
-- A robot that slides onto one end comes out of the other end, moving in the
+- A worker that slides onto one end comes out of the other end, moving in the
   same direction, and keeps sliding. Entering from the top means leaving
   through the bottom.
-- If the cell right after the far end is blocked, the robot stops on the far
+- If the cell right after the far end is blocked, the worker stops on the far
   end.
-- If another robot sits on the far end, the moving robot stops on the end it
+- If another worker sits on the far end, the moving worker stops on the end it
   entered.
-- A robot that stands on an end simply moves off it. It has to leave the
+- A worker that stands on an end simply moves off it. It has to leave the
   portal before it can use it.
 
 ### Diagonal walls
@@ -58,16 +58,16 @@ ends of a portal.
 When you create a room or start a new board, you pick how many quadrants
 get colored diagonal walls, from 0 to 4. The default is 2. Which quadrants get
 them is random, and each of those quadrants gets two diagonals.
-A robot of a different color bounces off a diagonal at a right angle and keeps
-sliding. A robot of the same color passes straight through. The black robot
-always bounces. A robot that starts on a diagonal moves off it in a straight
+A worker of a different color bounces off a diagonal at a right angle and keeps
+sliding. A worker of the same color passes straight through. The black worker
+always bounces. A worker that starts on a diagonal moves off it in a straight
 line.
 
-### The white robot
+### The white worker
 
-When you create a room or start a new board, you can add a white robot. It
+When you create a room or start a new board, you can add a white worker. It
 passes straight through every diagonal, whatever its color. Normal walls stop
-it like any other robot. Like the black robot, it never has a target.
+it like any other worker. Like the black worker, it never has a target.
 
 ### Who called first
 
@@ -114,7 +114,7 @@ which is far more than a group of friends needs.
 
 GitHub Pages is free for public repositories.
 
-1. Go to <https://github.com/new>. Name the repository `ricochet`, make it
+1. Go to <https://github.com/new>. Name the repository `worker`, make it
    **Public**, and click **Create repository**.
 2. Put the files in the repository. You can do this in the browser or with
    git.
@@ -185,7 +185,7 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
 | File | What it does |
 | --- | --- |
 | `index.html`, `style.css` | Page layout for the lobby and the game |
-| `js/board.js` | Board generator, robot movement (portal and diagonals included), and the search that finds short targets |
+| `js/board.js` | Board generator, worker movement (portal and diagonals included), and the search that finds short targets |
 | `js/game.js` | Rules for calls, the timer, and who shows their moves |
 | `js/main.js` | Drawing, input, and sending actions to the database |
 | `js/backend-firebase.js` | Firebase Realtime Database connection |
@@ -202,7 +202,7 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
   never in the same row or column as the first.
 - The short walls on the board edge never touch the walls around a target or
   the portal, so no cell becomes a pocket with a single way out.
-- Boards where a robot could bounce around forever between diagonals or
+- Boards where a worker could bounce around forever between diagonals or
   through the portal are thrown away.
 - Anyone in the room can skip a target before the first call, and anyone can
   start a new board.
