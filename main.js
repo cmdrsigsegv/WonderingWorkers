@@ -11,6 +11,7 @@ import {
   parseMoves,
   applyMoves,
   robotOnTarget,
+  isCenter,
   MAX_SHORT_MOVES,
 } from './board.js';
 import {
@@ -268,6 +269,8 @@ function enterRoom(id) {
   }
   S.roomId = id;
   S.room = null;
+  // Chat only shows messages sent after this moment.
+  S.joinedAt = backend.now();
   S.shown = null;
   S.to = null;
   $('#lobby').hidden = true;
@@ -344,7 +347,7 @@ function canMove(vm) {
 
 // A single caller is not held to their number, so they get more room.
 function moveLimit(vm) {
-  return vm.solo ? SOLO_MAX_MOVES : vm.bid;
+  return vm.limit;
 }
 
 function doMove(idx, dir) {
@@ -499,6 +502,9 @@ panel.addEventListener('click', (e) => {
     case 'next':
       nextRound();
       break;
+    case 'clearoff':
+      confirmOr('clearoff', clearOffline);
+      break;
     case 'newgame':
     case 'start':
       startNewGame(
@@ -506,6 +512,13 @@ panel.addEventListener('click', (e) => {
         b.closest('#action').querySelector('input[type=checkbox]').checked,
       );
       break;
+  }
+});
+
+// The target icon in the status line also replays the rings.
+$('#status').addEventListener('click', (e) => {
+  if (e.target.closest('svg')) {
+    startPulse();
   }
 });
 
@@ -583,6 +596,65 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// Chat. Each player only sees messages sent after they opened the room.
+// Messages older than CHAT_KEEP_MS, or beyond the newest CHAT_KEEP_COUNT,
+// are deleted whenever someone sends a new one, so nothing piles up.
+
+const CHAT_KEEP_MS = 30 * 60 * 1000;
+const CHAT_KEEP_COUNT = 50;
+
+function chatMessages() {
+  const chat = (S.room && S.room.chat) || {};
+  return Object.entries(chat)
+    .map(([key, m]) => ({ key, ...m }))
+    .filter((m) => typeof m.t === 'number')
+    .sort((a, b) => a.t - b.t || (a.key < b.key ? -1 : 1));
+}
+
+function sendChat(text) {
+  const clean = text.trim().slice(0, 200);
+  if (!clean || !S.roomId) {
+    return;
+  }
+  backend.push(roomPath('chat'), { uid, name: getName(), text: clean, t: backend.TS });
+  const all = chatMessages();
+  const cutoff = backend.now() - CHAT_KEEP_MS;
+  const change = {};
+  all.forEach((m, i) => {
+    if (m.t < cutoff || i < all.length - (CHAT_KEEP_COUNT - 1)) {
+      change[m.key] = null;
+    }
+  });
+  if (Object.keys(change).length) {
+    backend.update(roomPath('chat'), change);
+  }
+}
+
+function renderChat() {
+  const log = $('#chat-log');
+  const mine = chatMessages().filter((m) => m.t >= S.joinedAt);
+  const html = mine.length
+    ? mine
+        .map((m) => `<div class="msg"><b${m.uid === uid ? ' class="me"' : ''}>${esc(m.name || 'Someone')}</b> ${esc(m.text)}</div>`)
+        .join('')
+    : '<div class="muted">No messages yet.</div>';
+  if (cache.get(log) !== html) {
+    const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
+    setHTML(log, html);
+    if (atBottom || (mine.length && mine[mine.length - 1].uid === uid)) {
+      log.scrollTop = log.scrollHeight;
+    }
+  }
+}
+
+$('#chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const input = $('#chat-input');
+  sendChat(input.value);
+  input.value = '';
+});
+
+// ---------------------------------------------------------------------------
 // Sound. A short beep when the timer starts and when it runs out.
 
 let audio = null;
@@ -634,6 +706,8 @@ function render() {
   }
   const game = S.room.game;
   const players = S.room.players || {};
+  rejoinIfRemoved(players);
+  renderChat();
   if (!game) {
     setHTML($('#status'), 'No game in this room yet.');
     setHTML(
@@ -703,8 +777,10 @@ function renderStatus(vm, players) {
       head = `${who} shows ${vm.bid}`;
       if (vm.solo && vm.bid === MIN_CALL) {
         sub = `Only caller. More than ${MIN_CALL} moves sends the target back in the pile.`;
-      } else if (vm.solo) {
-        sub = 'Only caller, so any number of moves counts.';
+      } else if (vm.unlimited) {
+        sub = vm.solo ? 'Only caller, so any number of moves counts.' : 'Nobody is left behind them, so any number of moves counts.';
+      } else if (vm.limit > vm.bid) {
+        sub = `The next call is ${vm.nextCall}, so up to ${vm.limit} moves count.`;
       } else {
         sub = vm.demonstrator === uid ? 'Your turn to show the moves.' : 'Watch the robots move.';
       }
@@ -756,9 +832,14 @@ function renderAction(vm, players, game) {
 
   if (vm.phase === 'demo') {
     const k = moveCount(vm.moves);
-    const count = vm.solo
-      ? `<div class="big">${k} move${k === 1 ? '' : 's'}</div><p class="hint">Called ${vm.bid}.</p>`
-      : `<div class="big">${k} / ${vm.bid}</div>`;
+    let count;
+    if (vm.unlimited) {
+      count = `<div class="big">${k} move${k === 1 ? '' : 's'}</div><p class="hint">Called ${vm.bid}.</p>`;
+    } else if (vm.limit > vm.bid) {
+      count = `<div class="big">${k} / ${vm.limit}</div><p class="hint">Called ${vm.bid}.</p>`;
+    } else {
+      count = `<div class="big">${k} / ${vm.bid}</div>`;
+    }
     if (vm.demonstrator === uid) {
       const out = k >= moveLimit(vm) ? '<p class="hint bad">Out of moves. Undo, start over, or give up.</p>' : '';
       setHTML(
@@ -843,6 +924,40 @@ function renderCalls(vm, players) {
   setHTML($('#calls'), `<h3>Calls</h3><ol class="calls">${items.join('')}</ol>`);
 }
 
+// Offline players who hold no tokens on this board. Those are safe to
+// remove, since the scores do not need them.
+function removablePlayers(game, players) {
+  const won = game ? tokensWon(game) : new Map();
+  return Object.keys(players).filter((id) => players[id].online === false && !(won.get(id) || []).length);
+}
+
+function clearOffline() {
+  const players = (S.room && S.room.players) || {};
+  const ids = removablePlayers(S.room && S.room.game, players);
+  if (ids.length === 0) {
+    return;
+  }
+  const change = {};
+  ids.forEach((id) => {
+    change[id] = null;
+  });
+  backend.update(roomPath('players'), change);
+}
+
+// Someone else may have cleared this player while their connection was
+// down. Put the name back so they do not show up as "Someone".
+function rejoinIfRemoved(players) {
+  const me = players[uid];
+  if (me && me.name) {
+    return;
+  }
+  if (S.rejoinAt && Date.now() - S.rejoinAt < 2000) {
+    return;
+  }
+  S.rejoinAt = Date.now();
+  backend.update(roomPath(`players/${uid}`), { name: getName(), online: true });
+}
+
 function renderScores(game, players) {
   const board = boardFor(game);
   const won = tokensWon(game);
@@ -856,7 +971,16 @@ function renderScores(game, players) {
       playerName(players, id),
     )}</span><span class="tokens">${chips}<span class="count">${list.length}</span></span></li>`;
   });
-  setHTML($('#scores'), `<h3>Players</h3><ul class="scores">${items.join('')}</ul>`);
+  const removable = removablePlayers(game, players).length;
+  const clear = removable
+    ? `<button class="small" data-act="clearoff">${
+        S.confirm === 'clearoff' ? 'Tap again to clear' : `Clear offline (${removable})`
+      }</button>`
+    : '';
+  setHTML(
+    $('#scores'),
+    `<div class="head"><h3>Players</h3>${clear}</div><ul class="scores">${items.join('')}</ul>`,
+  );
 }
 
 function renderTimer(vm, now) {
@@ -975,6 +1099,7 @@ function updateBoard(vm, game) {
   const target = vm.robots;
   // Snap on a new round. Animate when positions change within a round.
   if (!S.shown || S.animRound !== vm.n || S.animGame !== game.id) {
+    startPulse();
     S.shown = target.map((r) => ({ x: r.x, y: r.y }));
     S.to = target;
     S.anim = null;
@@ -1018,7 +1143,45 @@ function updateBoard(vm, game) {
   }
 }
 
+// A new target makes the target square and the robot that has to reach it
+// send out a few rings, so everyone spots them at once. Tapping the center
+// block or the target icon above the calls plays it again.
+const PULSE_MS = 2400;
+const PULSE_PERIOD = 800;
+
+function startPulse() {
+  S.pulseStart = performance.now();
+  S.pulseDone = false;
+  S.dirty = true;
+}
+
+function pulsePhase() {
+  if (S.pulseStart == null) {
+    return null;
+  }
+  const t = performance.now() - S.pulseStart;
+  return t < PULSE_MS ? (t % PULSE_PERIOD) / PULSE_PERIOD : null;
+}
+
+function drawPing(cx, cy, c, color, phase) {
+  ctx.save();
+  ctx.globalAlpha = 0.85 * (1 - phase);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = c * 0.1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, c * (0.5 + 1.1 * phase), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function frame() {
+  // Keep drawing while the rings run, plus one last frame to clear them.
+  if (S.pulseStart != null && !S.pulseDone) {
+    S.dirty = true;
+    if (pulsePhase() === null) {
+      S.pulseDone = true;
+    }
+  }
   const a = S.anim;
   if (a) {
     const t = Math.min(1, (performance.now() - a.t0) / a.dur);
@@ -1089,12 +1252,16 @@ function draw(vm, game) {
     const isCur = t.id === vm.target.id;
     if (isCur) {
       ctx.save();
-      ctx.globalAlpha = 0.3;
+      ctx.globalAlpha = 0.4;
       ctx.fillStyle = ROBOT_HEX[t.color];
       ctx.fillRect(t.x * c, t.y * c, c, c);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = ROBOT_HEX[t.color];
+      ctx.lineWidth = c * 0.08;
+      ctx.strokeRect((t.x + 0.06) * c, (t.y + 0.06) * c, c * 0.88, c * 0.88);
       ctx.restore();
     }
-    const alpha = isCur ? 1 : won.has(t.id) ? 0.15 : 0.45;
+    const alpha = isCur ? 1 : won.has(t.id) ? 0.15 : 0.4;
     drawSymbol(t, (t.x + 0.5) * c, (t.y + 0.5) * c, c * 0.62, alpha);
   }
 
@@ -1215,13 +1382,23 @@ function draw(vm, game) {
   ctx.lineWidth = Math.max(2, c * 0.12);
   ctx.strokeRect(0, 0, W, W);
 
-  // Robots.
+  // Robots. The one that has to reach the target wears a ring in its own
+  // color while the round is open.
+  const targetIdx = COLORS.indexOf(vm.target.color);
+  const open = vm.phase !== 'done';
   S.shown.forEach((r, i) => {
     const cx = (r.x + 0.5) * c;
     const cy = (r.y + 0.5) * c;
+    if (open && i === targetIdx) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, c * 0.45, 0, Math.PI * 2);
+      ctx.strokeStyle = ROBOT_HEX[COLORS[i]];
+      ctx.lineWidth = c * 0.07;
+      ctx.stroke();
+    }
     if (S.selected === i && canMove(vm)) {
       ctx.beginPath();
-      ctx.arc(cx, cy, c * 0.47, 0, Math.PI * 2);
+      ctx.arc(cx, cy, c * 0.53, 0, Math.PI * 2);
       ctx.strokeStyle = th.accent;
       ctx.lineWidth = c * 0.08;
       ctx.stroke();
@@ -1238,6 +1415,15 @@ function draw(vm, game) {
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fill();
   });
+
+  // Rings going out from the target square and the target robot.
+  const phase = pulsePhase();
+  if (open && phase !== null) {
+    const color = ROBOT_HEX[vm.target.color];
+    const r = S.shown[targetIdx];
+    drawPing((vm.target.x + 0.5) * c, (vm.target.y + 0.5) * c, c, color, phase);
+    drawPing((r.x + 0.5) * c, (r.y + 0.5) * c, c, color, phase);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1254,10 +1440,14 @@ function cellAt(e) {
 
 canvas.addEventListener('pointerdown', (e) => {
   const vm = fresh();
+  const { x, y } = cellAt(e);
+  if (isCenter(x, y)) {
+    startPulse();
+    return;
+  }
   if (!canMove(vm)) {
     return;
   }
-  const { x, y } = cellAt(e);
   const idx = vm.robots.findIndex((r) => r.x === x && r.y === y);
   if (idx < 0) {
     return;

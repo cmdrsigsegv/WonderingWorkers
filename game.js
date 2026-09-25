@@ -47,7 +47,7 @@ export function attemptKey(i) {
 // A call of MIN_CALL cannot be beaten, so it shortens the wait to this.
 export const FAST_MS = 5000;
 
-// A single caller may use up to this many moves when showing a solution.
+// Upper bound on moves for someone with nobody behind them in line.
 export const SOLO_MAX_MOVES = 40;
 
 // Bids are an append-only log of { uid, n, t } where t is the server
@@ -236,6 +236,22 @@ export function deriveRound(game, now) {
   view.attemptIdx = i;
   view.demonstrator = bidding.order[i].uid;
   view.bid = bidding.order[i].n;
+  // Move limit. Using more moves than you called is fine as long as you
+  // still beat the next caller in line, so the limit is one less than their
+  // call, and never below your own. Nobody behind you means no limit.
+  //
+  // A call of MIN_CALL is different, since it cut everyone's thinking time
+  // short. That caller must make it in MIN_CALL moves. The only exception
+  // is the single caller, who may go on, but then nobody scores and the
+  // target goes back in the pile (handled in main.js).
+  const next = bidding.order[i + 1];
+  view.nextCall = next ? next.n : null;
+  if (view.bid === MIN_CALL && !view.solo) {
+    view.limit = MIN_CALL;
+  } else {
+    view.limit = next ? Math.max(view.bid, next.n - 1) : SOLO_MAX_MOVES;
+  }
+  view.unlimited = view.limit === SOLO_MAX_MOVES;
   view.moves = a.moves || '';
   view.robots = applyMoves(board, start, view.moves);
   view.reached = robotOnTarget(view.robots, target);

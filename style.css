@@ -276,6 +276,7 @@ select {
 
 #status svg {
   flex: none;
+  cursor: pointer;
 }
 
 #status .sub {
@@ -409,6 +410,39 @@ ul.scores li .tokens {
 ul.scores li .count {
   font-weight: 700;
   margin-left: 6px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.head h3 {
+  margin: 0;
+}
+
+.chat-log {
+  max-height: 150px;
+  min-height: 40px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.chat-log .msg + .msg {
+  margin-top: 2px;
+}
+
+#chat-form input {
+  padding: 6px 10px;
 }
 
 .good {

@@ -12,12 +12,40 @@
               "bids": {
                 "$bid": {
                   ".validate": "!data.exists() && newData.hasChildren(['uid', 'n', 't'])",
-                  "uid": { ".validate": "newData.isString() && newData.val().length <= 32" },
-                  "n": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 99" },
-                  "t": { ".validate": "newData.val() == now" },
-                  "$other": { ".validate": false }
+                  "uid": {
+                    ".validate": "newData.isString() && newData.val().length <= 32"
+                  },
+                  "n": {
+                    ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 99"
+                  },
+                  "t": {
+                    ".validate": "newData.val() == now"
+                  },
+                  "$other": {
+                    ".validate": false
+                  }
                 }
               }
+            }
+          }
+        },
+        "chat": {
+          "$msg": {
+            ".validate": "newData.hasChildren(['uid', 'name', 'text', 't'])",
+            "uid": {
+              ".validate": "newData.isString() && newData.val().length <= 32"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 16"
+            },
+            "text": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            },
+            "t": {
+              ".validate": "newData.val() == now"
+            },
+            "$other": {
+              ".validate": false
             }
           }
         }

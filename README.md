@@ -24,14 +24,20 @@ moves in sync between players.
 6. When the timer runs out, the lowest call shows their moves. Ties go to
    whoever made that call first. They drag workers on the board, and everyone
    else watches the moves happen live.
-7. Reaching the target within the called number of moves wins the token. If
-   they give up, the workers go back and the next caller tries.
-8. If only one person called, they take the token as long as they reach the
-   target, even if they miscounted in either direction. The exception is a
-   single call of 5 that turns out to need more moves. That call cut
-   everyone's timer short, so nobody scores and the target goes back in the
-   pile. If it was the last target that could still be played, the caller
-   keeps the token.
+7. The person showing their moves may use more moves than they called, as
+   long as they still beat the next caller in line. So their limit is one
+   less than the next call, and never below their own call. With calls of 9
+   and 13, the 9 caller may use up to 12 moves. With two calls of 9, the
+   limit stays at 9. A call of 5 is the exception. It cut everyone's
+   thinking time, so a 5 must be made in 5 moves. Reaching the target within
+   the limit wins the token. If they give up, the workers go back and the
+   next caller tries.
+8. Whoever has nobody behind them in line takes the token as long as they
+   reach the target, even if they miscounted in either direction. The
+   exception is a single call of 5 that turns out to need more moves. That
+   call cut everyone's timer short, so nobody scores and the target goes
+   back in the pile. If it was the last target that could still be played,
+   the caller keeps the token.
 9. The workers stay where they ended after a win.
 
 Targets that can be reached in 4 moves or fewer are never drawn. The game ends
@@ -75,6 +81,14 @@ The server decides who called first. Every call gets the time it reached the
 Firebase server, and the security rules reject calls with any other time. A
 friend with a slow connection is still a bit behind, but nobody can fake it.
 
+### Spotting the target
+
+When a new target is drawn, the target square and the worker that has to
+reach it send out a few rings in the target's color. After that, the target
+square keeps a colored border and the worker keeps a ring in its own color
+until the round ends. Tap the center block or the target icon above the
+calls to see the rings again.
+
 ## Setup
 
 There are two parts. Firebase holds the shared game data, and GitHub Pages
@@ -98,7 +112,7 @@ serves the website. Both are free for this.
    nickname. Leave **Firebase Hosting** unticked, and click **Register app**.
 6. The page now shows a block of code with `const firebaseConfig = { ... }`.
    Copy the values of `apiKey`, `authDomain`, `databaseURL`, `projectId`, and
-   `appId` into `js/config.js`. If `databaseURL` is missing, copy it from the
+   `appId` into `config.js`. If `databaseURL` is missing, copy it from the
    top of the **Data** tab of the Realtime Database. It looks like
    `https://<project>-default-rtdb.europe-west1.firebasedatabase.app`.
 7. Check it on your own computer. In this folder run
@@ -119,16 +133,16 @@ GitHub Pages is free for public repositories.
 2. Put the files in the repository. You can do this in the browser or with
    git.
    - In the browser: on the new repository page, click **uploading an
-     existing file**. Drag in the contents of this folder, so that
-     `index.html` sits at the top level and `js` is a folder next to it.
-     Click **Commit changes**.
+     existing file**. Drag in all the files from this folder. They all sit
+     together at the top level, next to `index.html`. Click **Commit
+     changes**.
    - With git, from inside this folder:
 
      ```sh
      git init -b main
      git add .
      git commit -m "Ricochet"
-     git remote add origin https://github.com/<user>/ricochet.git
+     git remote add origin https://github.com/<user>/worker.git
      git push -u origin main
      ```
 
@@ -136,7 +150,7 @@ GitHub Pages is free for public repositories.
    deployment**, set **Source** to **Deploy from a branch**. Pick the `main`
    branch and the `/ (root)` folder, and click **Save**.
 4. After a minute or two the site is live at
-   `https://<user>.github.io/ricochet/`. The **Actions** tab shows the
+   `https://<user>.github.io/worker/`. The **Actions** tab shows the
    progress.
 
 To update the site later, change the files and commit them again, or upload
@@ -157,7 +171,7 @@ opens the link and types a name.
 
 ### If something does not work
 
-- The lobby says "Local test mode": `js/config.js` still has a `PASTE`
+- The lobby says "Local test mode": `config.js` still has a `PASTE`
   value in it.
 - Nothing happens after **Create a room**, and the browser console shows
   `permission_denied`: the rules from `database.rules.json` were not
@@ -167,7 +181,7 @@ opens the link and types a name.
 
 ## Testing without Firebase
 
-While `js/config.js` still has the placeholder values, the site runs in local
+While `config.js` still has the placeholder values, the site runs in local
 test mode. In local mode the game data lives in the browser, so every tab is a
 separate player.
 
@@ -185,12 +199,12 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
 | File | What it does |
 | --- | --- |
 | `index.html`, `style.css` | Page layout for the lobby and the game |
-| `js/board.js` | Board generator, worker movement (portal and diagonals included), and the search that finds short targets |
-| `js/game.js` | Rules for calls, the timer, and who shows their moves |
-| `js/main.js` | Drawing, input, and sending actions to the database |
-| `js/backend-firebase.js` | Firebase Realtime Database connection |
-| `js/backend-local.js` | Local test mode that stores data in the browser |
-| `js/config.js` | Your Firebase settings |
+| `board.js` | Board generator, worker movement (portal and diagonals included), and the search that finds short targets |
+| `game.js` | Rules for calls, the timer, and who shows their moves |
+| `main.js` | Drawing, input, and sending actions to the database |
+| `backend-firebase.js` | Firebase Realtime Database connection |
+| `backend-local.js` | Local test mode that stores data in the browser |
+| `config.js` | Your Firebase settings |
 | `database.rules.json` | Security rules for the database |
 
 ## Notes
@@ -208,5 +222,11 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
   start a new board.
 - If the person showing their moves goes offline, the others can move on to
   the next caller.
+- **Clear offline** under the player list removes players who are offline and
+  hold no tokens on the current board. Players with tokens stay, so the
+  scores remain right.
+- The chat under the player list shows only messages sent after you opened
+  the room. Messages older than 30 minutes, or beyond the newest 50, are
+  deleted whenever someone sends a new one.
 - Anyone who knows a room code can write to that room. That is fine for a
   friend group. Old rooms stay in the database, but they are tiny.
