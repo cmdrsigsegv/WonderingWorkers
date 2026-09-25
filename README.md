@@ -1,6 +1,6 @@
 # Wondering Workers
 
-A browser inspired version of "Ricochet robots". It is a
+A browser inspired, fully vibe-coded version of "Ricochet robots". It is a
 static website. Firebase Realtime Database keeps the calls, the timer, and the
 moves in sync between players.
 
