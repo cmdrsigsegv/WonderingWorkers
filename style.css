@@ -424,6 +424,18 @@ ul.scores li .count {
   margin: 0;
 }
 
+button.link {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+#rename-form input {
+  padding: 6px 10px;
+}
+
 .chat-log {
   max-height: 150px;
   min-height: 40px;

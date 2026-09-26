@@ -81,6 +81,18 @@ The server decides who called first. Every call gets the time it reached the
 Firebase server, and the security rules reject calls with any other time. A
 friend with a slow connection is still a bit behind, but nobody can fake it.
 
+### Game modes
+
+When you create a room or start a new board, you pick a game mode. For now
+there is one mode, **Classic**, which plays by all the rules above. The header
+shows the mode of the current board.
+
+### Changing your name
+
+Click **Edit** next to your own name in the player list, type a new name, and
+press Enter. Everyone sees the new name straight away in the player list and
+the calls. Chat messages you already sent keep the old name.
+
 ### Spotting the target
 
 When a new target is drawn, the target square and the worker that has to

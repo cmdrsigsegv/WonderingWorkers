@@ -25,6 +25,9 @@ import {
   moveCount,
   boardFor,
   diagQuadrantsOf,
+  MODES,
+  DEFAULT_MODE,
+  modeOf,
   otherPlayableTarget,
   MIN_CALL,
   SOLO_MAX_MOVES,
@@ -191,14 +194,36 @@ function readName() {
   return name;
 }
 
-function newGame(diagQuadrants, whiteRobot) {
+// Board options live in three places: the lobby, the New board menu, and
+// the panel when a game ends. Each place marks its fields with data-opt.
+function modeOptionsHTML(selected) {
+  return Object.entries(MODES)
+    .map(([key, m]) => `<option value="${key}"${key === selected ? ' selected' : ''}>${esc(m.name)}</option>`)
+    .join('');
+}
+
+document.querySelectorAll('select[data-opt="mode"]').forEach((sel) => {
+  sel.innerHTML = modeOptionsHTML(DEFAULT_MODE);
+});
+
+function readOptions(container) {
+  const pick = (name) => container.querySelector(`[data-opt="${name}"]`);
+  return {
+    mode: pick('mode') ? pick('mode').value : DEFAULT_MODE,
+    diagQuadrants: Number(pick('diag').value),
+    whiteRobot: pick('white').checked,
+  };
+}
+
+function newGame(opts) {
   for (;;) {
     const game = {
       id: randomId(8, CODE_ALPHABET),
       seed: Math.floor(Math.random() * 2 ** 31),
       timerMs: TIMER_MS,
-      diagQuadrants,
-      whiteRobot: !!whiteRobot,
+      mode: MODES[opts.mode] ? opts.mode : DEFAULT_MODE,
+      diagQuadrants: opts.diagQuadrants,
+      whiteRobot: !!opts.whiteRobot,
     };
     const first = makeNextRound({ ...game, rounds: {} }, Math.random);
     if (first) {
@@ -213,11 +238,8 @@ $('#create').addEventListener('click', async () => {
     return;
   }
   const id = randomId(5, CODE_ALPHABET);
-  const diagQuadrants = Number($('#opt-diag').value);
-  const white = $('#opt-white').checked;
-  const ok = await backend.transaction(`rooms/${id}/game`, (cur) =>
-    cur === null ? newGame(diagQuadrants, white) : undefined,
-  );
+  const opts = readOptions($('#lobby-create'));
+  const ok = await backend.transaction(`rooms/${id}/game`, (cur) => (cur === null ? newGame(opts) : undefined));
   if (ok) {
     location.hash = id;
   } else {
@@ -425,11 +447,11 @@ function nextRound() {
   backend.transaction(roomPath(`game/rounds/${roundKey(vm.n + 1)}`), (cur) => (cur === null ? next : undefined));
 }
 
-function startNewGame(diagQuadrants, whiteRobot) {
+function startNewGame(opts) {
   const currentId = S.room && S.room.game ? S.room.game.id : null;
   S.selected = null;
   S.newBoardMenu = false;
-  backend.transaction(roomPath('game'), (cur) => (cur && cur.id !== currentId ? undefined : newGame(diagQuadrants, whiteRobot)));
+  backend.transaction(roomPath('game'), (cur) => (cur && cur.id !== currentId ? undefined : newGame(opts)));
 }
 
 // The next round, worked out once per finished round. Finding out which
@@ -507,10 +529,10 @@ panel.addEventListener('click', (e) => {
       break;
     case 'newgame':
     case 'start':
-      startNewGame(
-        Number(b.closest('#action').querySelector('select').value),
-        b.closest('#action').querySelector('input[type=checkbox]').checked,
-      );
+      startNewGame(readOptions($('#action')));
+      break;
+    case 'rename':
+      openRename();
       break;
   }
 });
@@ -524,6 +546,7 @@ $('#status').addEventListener('click', (e) => {
 
 $('#new-board').addEventListener('click', () => {
   S.newBoardMenu = !S.newBoardMenu;
+  $('#nb-mode').value = DEFAULT_MODE;
   $('#nb-diag').value = '2';
   $('#nb-white').checked = false;
   render();
@@ -537,7 +560,7 @@ $('#new-board-menu').addEventListener('click', (e) => {
     S.newBoardMenu = false;
     render();
   } else if (b.dataset.newboard === 'start') {
-    startNewGame(Number($('#nb-diag').value), $('#nb-white').checked);
+    startNewGame(readOptions($('#new-board-menu')));
   }
 });
 
@@ -691,14 +714,51 @@ function playerName(players, id) {
   return p && p.name ? p.name : 'Someone';
 }
 
-// Picker for how many quadrants get diagonal walls. Two by default.
+// Board options for the panel: mode, diagonal quadrants (two by default),
+// and the white robot.
 function diagPickHTML() {
   const opts = [0, 1, 2, 3, 4].map((n) => `<option${n === 2 ? ' selected' : ''}>${n}</option>`).join('');
   return (
-    `<label class="diag-pick muted">Diagonal quadrants <select>${opts}</select></label>` +
-    '<label class="diag-pick muted"><input type="checkbox"> White robot</label>'
+    `<label class="diag-pick muted">Mode <select data-opt="mode">${modeOptionsHTML(DEFAULT_MODE)}</select></label>` +
+    `<label class="diag-pick muted">Diagonal quadrants <select data-opt="diag">${opts}</select></label>` +
+    '<label class="diag-pick muted"><input type="checkbox" data-opt="white"> White robot</label>'
   );
 }
+
+// Changing your name. The new name shows everywhere at once, because calls
+// and scores look names up in the player list. Chat keeps the name a
+// message was sent with.
+function openRename() {
+  const form = $('#rename-form');
+  form.hidden = false;
+  $('#rename-input').value = getName();
+  $('#rename-input').focus();
+  $('#rename-input').select();
+}
+
+function closeRename() {
+  $('#rename-form').hidden = true;
+}
+
+$('#rename-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('#rename-input').value.trim().slice(0, 16);
+  if (!name) {
+    $('#rename-input').focus();
+    return;
+  }
+  storeSet('rr-name', name);
+  if (S.roomId) {
+    backend.update(roomPath(`players/${uid}`), { name });
+  }
+  closeRename();
+});
+$('#rename-cancel').addEventListener('click', closeRename);
+$('#rename-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeRename();
+  }
+});
 
 function render() {
   if (!S.room || !S.roomId) {
@@ -745,7 +805,7 @@ function render() {
   $('#new-board').hidden = !!S.newBoardMenu;
   $('#new-board-menu').hidden = !S.newBoardMenu;
   const dq = diagQuadrantsOf(game);
-  const kind = [];
+  const kind = [MODES[modeOf(game)].name];
   if (dq) {
     kind.push(`Diagonals in ${dq} quadrant${dq === 1 ? '' : 's'}`);
   }
@@ -967,9 +1027,10 @@ function renderScores(game, players) {
     const list = won.get(id) || [];
     const chips = list.map((tid) => symbolSVG(board.targets.find((t) => t.id === tid), 14)).join('');
     const on = players[id].online !== false;
+    const edit = id === uid ? '<button class="link" data-act="rename">Edit</button>' : '';
     return `<li class="${id === uid ? 'me' : ''}"><span class="dot ${on ? 'on' : ''}"></span><span class="who">${esc(
       playerName(players, id),
-    )}</span><span class="tokens">${chips}<span class="count">${list.length}</span></span></li>`;
+    )}</span>${edit}<span class="tokens">${chips}<span class="count">${list.length}</span></span></li>`;
   });
   const removable = removablePlayers(game, players).length;
   const clear = removable

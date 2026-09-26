@@ -18,6 +18,18 @@ export { MIN_CALL };
 
 export const DEFAULT_TIMER_MS = 60000;
 
+// Game modes offered when a board is created. Each game stores its mode's
+// key in `game.mode`. New modes get an entry here, and their rules can
+// check modeOf(game).
+export const MODES = {
+  classic: { name: 'Classic' },
+};
+export const DEFAULT_MODE = 'classic';
+
+export function modeOf(game) {
+  return game && MODES[game.mode] ? game.mode : DEFAULT_MODE;
+}
+
 // Round keys are "r0", "r1", ... so the database never turns them into arrays.
 export function roundKey(n) {
   return `r${n}`;

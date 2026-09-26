@@ -15,10 +15,13 @@
         <input id="name" maxlength="16" autocomplete="nickname" placeholder="Name">
       </label>
       <div id="lobby-create">
-        <label class="check">Quadrants with diagonal walls
-          <select id="opt-diag"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        <label class="check">Game mode
+          <select id="opt-mode" data-opt="mode"></select>
         </label>
-        <label class="check"><input type="checkbox" id="opt-white"> White robot that passes through diagonals</label>
+        <label class="check">Quadrants with diagonal walls
+          <select id="opt-diag" data-opt="diag"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        </label>
+        <label class="check"><input type="checkbox" id="opt-white" data-opt="white"> White robot that passes through diagonals</label>
         <button id="create" class="primary">Create a room</button>
         <div class="or">or join one</div>
         <div class="row">
@@ -39,10 +42,13 @@
       <button id="copy-link" class="small">Copy invite link</button>
       <button id="new-board" class="small">New board</button>
       <span id="new-board-menu" hidden>
-        <label class="muted">Diagonal quadrants
-          <select id="nb-diag"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        <label class="muted">Mode
+          <select id="nb-mode" data-opt="mode"></select>
         </label>
-        <label class="muted"><input type="checkbox" id="nb-white"> White robot</label>
+        <label class="muted">Diagonal quadrants
+          <select id="nb-diag" data-opt="diag"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+        </label>
+        <label class="muted"><input type="checkbox" id="nb-white" data-opt="white"> White robot</label>
         <button class="small primary" data-newboard="start">Start new board</button>
         <button class="small" data-newboard="cancel">Cancel</button>
       </span>
@@ -57,6 +63,11 @@
         <div id="action"></div>
         <div id="calls"></div>
         <div id="scores"></div>
+        <form id="rename-form" class="row" hidden>
+          <input id="rename-input" maxlength="16" autocomplete="nickname" placeholder="New name">
+          <button class="primary">Save</button>
+          <button type="button" id="rename-cancel">Cancel</button>
+        </form>
         <div id="chat">
           <h3>Chat</h3>
           <div id="chat-log" class="chat-log"></div>
