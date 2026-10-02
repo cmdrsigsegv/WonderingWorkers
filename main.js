@@ -34,6 +34,10 @@ import {
   IDLE_MS,
   IDLE_MARGIN_MS,
 } from './game.js';
+import { beep } from './sound.js';
+import { celebrate, showNice } from './effects.js';
+import { gameStats } from './stats.js';
+import { renderStats, attachTooltips } from './stats-view.js';
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -243,6 +247,7 @@ $('#create').addEventListener('click', async () => {
   const opts = readOptions($('#lobby-create'));
   const ok = await backend.transaction(`rooms/${id}/game`, (cur) => (cur === null ? newGame(opts) : undefined));
   if (ok) {
+    backend.update(`rooms/${id}/game/rounds/${roundKey(0)}`, { started: backend.TS });
     location.hash = id;
   } else {
     $('#lobby-error').textContent = 'Could not create a room. Try again.';
@@ -461,14 +466,28 @@ function nextRound() {
     return;
   }
   S.selected = null;
-  backend.transaction(roomPath(`game/rounds/${roundKey(vm.n + 1)}`), (cur) => (cur === null ? next : undefined));
+  const path = roomPath(`game/rounds/${roundKey(vm.n + 1)}`);
+  backend.transaction(path, (cur) => (cur === null ? next : undefined)).then((ok) => {
+    // When the target appeared, for the statistics.
+    if (ok) {
+      backend.update(path, { started: backend.TS });
+    }
+  });
 }
 
 function startNewGame(opts) {
   const currentId = S.room && S.room.game ? S.room.game.id : null;
   S.selected = null;
   S.newBoardMenu = false;
-  backend.transaction(roomPath('game'), (cur) => (cur && cur.id !== currentId ? undefined : newGame(opts)));
+  S.showStats = false;
+  const room = S.roomId;
+  backend
+    .transaction(roomPath('game'), (cur) => (cur && cur.id !== currentId ? undefined : newGame(opts)))
+    .then((ok) => {
+      if (ok) {
+        backend.update(`rooms/${room}/game/rounds/${roundKey(0)}`, { started: backend.TS });
+      }
+    });
 }
 
 // The next round, worked out once per finished round. Finding out which
@@ -547,6 +566,11 @@ panel.addEventListener('click', (e) => {
       break;
     case 'rename':
       openRename();
+      break;
+    case 'stats':
+      S.showStats = true;
+      render();
+      window.scrollTo(0, 0);
       break;
   }
 });
@@ -694,22 +718,77 @@ $('#chat-form').addEventListener('submit', (e) => {
 // ---------------------------------------------------------------------------
 // Sound. A short beep when the timer starts and when it runs out.
 
-let audio = null;
-function beep(freq, dur) {
+// The sounds themselves live in sound.js.
+
+// ---------------------------------------------------------------------------
+// Celebration, Nice, and statistics
+
+// Plays once per finished board in this tab.
+function maybeCelebrate(game, players) {
+  let done = null;
   try {
-    audio = audio || new AudioContext();
-    const o = audio.createOscillator();
-    const g = audio.createGain();
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(0.08, audio.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + dur);
-    o.connect(g).connect(audio.destination);
-    o.start();
-    o.stop(audio.currentTime + dur);
+    done = window.sessionStorage.getItem('rr-celebrated');
   } catch {
-    // No audio available. Not important.
+    done = S.celebrated || null;
   }
+  if (done === game.id) {
+    return;
+  }
+  S.celebrated = game.id;
+  try {
+    window.sessionStorage.setItem('rr-celebrated', game.id);
+  } catch {
+    // Storage blocked. S.celebrated covers this visit.
+  }
+  const won = tokensWon(game);
+  let best = 0;
+  for (const list of won.values()) {
+    best = Math.max(best, list.length);
+  }
+  if (best === 0) {
+    return;
+  }
+  const names = [...won.entries()].filter(([, l]) => l.length === best).map(([id]) => playerName(players, id));
+  const title = names.length > 1 ? `${names.join(' and ')} share the win!` : `${names[0]} wins!`;
+  celebrate(title, `${best} token${best === 1 ? '' : 's'} on this board`);
 }
+
+// One Nice per player per round. It is stored with the round, so it goes
+// away with the board.
+function sendNice() {
+  const vm = fresh();
+  if (!vm || (vm.round.nice && vm.round.nice[uid])) {
+    return;
+  }
+  backend.set(`${roundPath(vm)}/nice/${uid}`, backend.TS);
+}
+
+function showNewNices(vm, game, players) {
+  S.seenNice = S.seenNice || new Set();
+  for (const [id, t] of Object.entries(vm.round.nice || {})) {
+    const key = `${game.id}:${vm.n}:${id}`;
+    if (S.seenNice.has(key)) {
+      continue;
+    }
+    S.seenNice.add(key);
+    // Skip the ones sent before this player opened the room.
+    if (typeof t === 'number' && t >= S.joinedAt - 1000) {
+      showNice(playerName(players, id));
+    }
+  }
+  const btn = $('#nice-btn');
+  const sent = !!(vm.round.nice && vm.round.nice[uid]);
+  btn.disabled = sent;
+  btn.title = sent ? 'You already sent a Nice this round' : 'Send a thumbs up to everyone';
+}
+
+$('#nice-btn').addEventListener('click', sendNice);
+
+$('#stats-btn').addEventListener('click', () => {
+  S.showStats = !S.showStats;
+  render();
+});
+attachTooltips($('#stats'));
 
 // ---------------------------------------------------------------------------
 // Panel rendering. Each section is only rewritten when its HTML changes,
@@ -808,6 +887,17 @@ function render() {
   S.lastPhase = vm.phase;
   if (vm.phase !== 'demo') {
     S.selected = null;
+  }
+
+  showNewNices(vm, game, players);
+  if (vm.phase === 'done' && !nextRoundFor(game, vm)) {
+    maybeCelebrate(game, players);
+  }
+  $('#board-main').hidden = !!S.showStats;
+  $('#stats').hidden = !S.showStats;
+  $('#stats-btn').textContent = S.showStats ? 'Back to the board' : 'Statistics';
+  if (S.showStats) {
+    setHTML($('#stats-body'), renderStats(gameStats(game, now), players, window.innerWidth < 600));
   }
 
   renderStatus(vm, players);
@@ -948,7 +1038,9 @@ function renderAction(vm, players, game) {
     const why =
       left === 0
         ? 'All targets are taken.'
-        : `The ${left} target${left === 1 ? '' : 's'} left can all be reached in ${MAX_SHORT_MOVES} moves or fewer.`;
+        : left === 1
+          ? `The last target can be reached in ${MAX_SHORT_MOVES} moves or fewer.`
+          : `The ${left} targets left can all be reached in ${MAX_SHORT_MOVES} moves or fewer.`;
     const result =
       winners.length === 0
         ? 'Nobody won a token.'
@@ -956,6 +1048,7 @@ function renderAction(vm, players, game) {
     setHTML(
       el,
       `<p class="big">Game over</p><p class="hint">${why}</p><p>${result}</p>` +
+        '<div class="actions"><button data-act="stats">See the statistics</button></div>' +
         `<div class="actions">${diagPickHTML()}<button class="primary" data-act="newgame">Play a new board</button></div>`,
     );
   } else {

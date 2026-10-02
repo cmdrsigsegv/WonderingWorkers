@@ -96,6 +96,38 @@ Click **Edit** next to your own name in the player list, type a new name, and
 press Enter. Everyone sees the new name straight away in the player list and
 the calls. Chat messages you already sent keep the old name.
 
+### The end of a board
+
+When the last target is taken, the winner's name appears with poppers going
+off in the corners and confetti falling from the top. This is drawn on each
+player's own screen and scaled to its size, so a phone gets fewer and smaller
+pieces. If your device is set to reduce motion, you only get the name. Tap the
+name to close it.
+
+### Nice
+
+The **Nice** button beside the chat sends a thumbs up to everyone. It pops up
+over the board and fades. You can send one per round.
+
+### Statistics
+
+The **Statistics** button in the header opens a page about the current board.
+It is most useful once the board is finished.
+
+- Headline numbers, such as rounds played, the average number of moves to
+  win, and the usual wait before the first call.
+- How soon the other calls came after the first call, per player.
+- How many rounds were won with each number of moves, and how often each
+  number was called.
+- A map of the board showing which squares the workers used most.
+- A table per player and a table per round.
+
+All of it is worked out from the rounds of the current board. Nothing extra is
+stored, and it is gone when a new board starts.
+
+The sounds are simple placeholders made in the browser. They live in
+`sound.js` and can be swapped for real sound files later.
+
 ### What the workers look like
 
 Workers are drawn as small figures with an antenna, a visor with two eyes, a
@@ -223,6 +255,10 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
 | `board.js` | Board generator, worker movement (portal and diagonals included), and the search that finds short targets |
 | `game.js` | Rules for calls, the timer, and who shows their moves |
 | `main.js` | Drawing, input, and sending actions to the database |
+| `stats.js` | Works out the statistics from the board's rounds |
+| `stats-view.js` | Draws the statistics page and its charts |
+| `effects.js` | Confetti, poppers, the winner's name, and the thumbs up |
+| `sound.js` | Placeholder sounds |
 | `backend-firebase.js` | Firebase Realtime Database connection |
 | `backend-local.js` | Local test mode that stores data in the browser |
 | `config.js` | Your Firebase settings |

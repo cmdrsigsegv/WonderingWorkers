@@ -40,6 +40,7 @@
     <header>
       <div class="room">Room <b id="room-code"></b></div>
       <button id="copy-link" class="small">Copy invite link</button>
+      <button id="stats-btn" class="small">Statistics</button>
       <button id="new-board" class="small">New board</button>
       <span id="new-board-menu" hidden>
         <label class="muted">Mode
@@ -55,7 +56,7 @@
       <span id="board-kind" class="muted"></span>
       <span id="mode" class="muted"></span>
     </header>
-    <main>
+    <main id="board-main">
       <div class="board-wrap"><canvas id="board"></canvas></div>
       <aside class="panel" id="panel">
         <div id="status"></div>
@@ -69,7 +70,10 @@
           <button type="button" id="rename-cancel">Cancel</button>
         </form>
         <div id="chat">
-          <h3>Chat</h3>
+          <div class="head">
+            <h3>Chat</h3>
+            <button id="nice-btn" class="small" type="button">&#x1F44D; Nice</button>
+          </div>
           <div id="chat-log" class="chat-log"></div>
           <form id="chat-form" class="row">
             <input id="chat-input" maxlength="200" placeholder="Say something" autocomplete="off">
@@ -78,7 +82,18 @@
         </div>
       </aside>
     </main>
+    <section id="stats" hidden>
+      <div id="stats-body"></div>
+    </section>
   </section>
+
+  <canvas id="fx" hidden></canvas>
+  <div id="winner-banner" hidden>
+    <div class="who"></div>
+    <div class="what"></div>
+    <div class="close">Tap to close</div>
+  </div>
+  <div id="viz-tip" hidden></div>
 
   <script type="module" src="main.js"></script>
 </body>

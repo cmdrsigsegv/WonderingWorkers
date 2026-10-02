@@ -61,7 +61,7 @@ export const FAST_MS = 5000;
 
 // Whoever is showing their moves must keep going. This long without a move
 // counts the same as giving up.
-export const IDLE_MS = 7000;
+export const IDLE_MS = 15000;
 
 // The player's own screen stops taking moves this long before the idle
 // limit, so a move sent at the last moment cannot arrive too late.

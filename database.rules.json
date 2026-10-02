@@ -46,6 +46,14 @@
                     }
                   }
                 }
+              },
+              "nice": {
+                "$uid": {
+                  ".validate": "!data.exists() && newData.val() == now"
+                }
+              },
+              "started": {
+                ".validate": "newData.val() == now"
               }
             }
           }
