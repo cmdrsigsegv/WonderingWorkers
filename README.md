@@ -38,7 +38,10 @@ moves in sync between players.
    call cut everyone's timer short, so nobody scores and the target goes
    back in the pile. If it was the last target that could still be played,
    the caller keeps the token.
-9. The workers stay where they ended after a win.
+9. Whoever is showing their moves has to keep going. If they make no move
+   for 7 seconds, that counts the same as giving up. The timer bar shows the
+   time left, and each move starts the 7 seconds again.
+10. The workers stay where they ended after a win.
 
 Targets that can be reached in 4 moves or fewer are never drawn. The game ends
 when all 16 targets are won, or when every target that is left can be reached
@@ -92,6 +95,12 @@ shows the mode of the current board.
 Click **Edit** next to your own name in the player list, type a new name, and
 press Enter. Everyone sees the new name straight away in the player list and
 the calls. Chat messages you already sent keep the old name.
+
+### What the workers look like
+
+Workers are drawn as small figures with an antenna, a visor with two eyes, a
+body, and a base. Targets are plain shapes, so a worker can't be mistaken for
+a target of the same color.
 
 ### Spotting the target
 
@@ -232,8 +241,8 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
   through the portal are thrown away.
 - Anyone in the room can skip a target before the first call, and anyone can
   start a new board.
-- If the person showing their moves goes offline, the others can move on to
-  the next caller.
+- If the person showing their moves goes offline, the 7 second limit moves
+  the game on to the next caller by itself.
 - **Clear offline** under the player list removes players who are offline and
   hold no tokens on the current board. Players with tokens stay, so the
   scores remain right.

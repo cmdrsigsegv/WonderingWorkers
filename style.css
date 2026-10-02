@@ -378,6 +378,18 @@ ol.calls li.failed {
   text-decoration: line-through;
 }
 
+ol.calls li .tag {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  display: inline-block;
+}
+
+#status .idle {
+  white-space: nowrap;
+  color: var(--text);
+}
+
 ol.calls li.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);

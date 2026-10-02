@@ -25,6 +25,27 @@
                     ".validate": false
                   }
                 }
+              },
+              "attempts": {
+                "$attempt": {
+                  "log": {
+                    "$entry": {
+                      ".validate": "!data.exists() && newData.hasChildren(['t'])",
+                      "m": {
+                        ".validate": "newData.isString() && newData.val().length <= 200"
+                      },
+                      "t": {
+                        ".validate": "newData.val() == now"
+                      },
+                      "end": {
+                        ".validate": "newData.isString() && newData.val().length <= 12"
+                      },
+                      "$other": {
+                        ".validate": false
+                      }
+                    }
+                  }
+                }
               }
             }
           }

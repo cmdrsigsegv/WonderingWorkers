@@ -31,6 +31,8 @@ import {
   otherPlayableTarget,
   MIN_CALL,
   SOLO_MAX_MOVES,
+  IDLE_MS,
+  IDLE_MARGIN_MS,
 } from './game.js';
 
 // ---------------------------------------------------------------------------
@@ -364,7 +366,23 @@ function retract() {
 }
 
 function canMove(vm) {
-  return vm && vm.phase === 'demo' && vm.demonstrator === uid && !vm.reached;
+  return (
+    vm &&
+    vm.phase === 'demo' &&
+    vm.demonstrator === uid &&
+    !vm.reached &&
+    backend.now() < vm.idleDeadline - IDLE_MARGIN_MS
+  );
+}
+
+// Every action while showing moves goes into the attempt's log with the
+// server time, so everyone agrees on when the idle limit ran out.
+function logAttempt(vm, moves, end) {
+  const entry = { m: moves, t: backend.TS };
+  if (end) {
+    entry.end = end;
+  }
+  backend.push(`${roundPath(vm)}/attempts/${attemptKey(vm.attemptIdx)}/log`, entry);
 }
 
 // A single caller is not held to their number, so they get more room.
@@ -412,7 +430,7 @@ function doMove(idx, dir) {
       beep(880, 0.15);
     }
   } else {
-    backend.set(`${roundPath(vm)}/${a}/moves`, moves);
+    logAttempt(vm, moves);
   }
 }
 
@@ -421,16 +439,15 @@ function setMoves(moves) {
   if (!canMove(vm)) {
     return;
   }
-  backend.set(`${roundPath(vm)}/attempts/${attemptKey(vm.attemptIdx)}/moves`, moves);
+  logAttempt(vm, moves);
 }
 
 function failAttempt() {
   const vm = fresh();
-  if (!vm || vm.phase !== 'demo') {
+  if (!vm || vm.phase !== 'demo' || vm.demonstrator !== uid) {
     return;
   }
-  const a = `attempts/${attemptKey(vm.attemptIdx)}`;
-  backend.update(roundPath(vm), { [`${a}/moves`]: vm.moves, [`${a}/result`]: 'fail' });
+  logAttempt(vm, vm.moves, 'fail');
 }
 
 function nextRound() {
@@ -517,9 +534,6 @@ panel.addEventListener('click', (e) => {
       break;
     case 'giveup':
       confirmOr('giveup', failAttempt);
-      break;
-    case 'markfail':
-      confirmOr('markfail', failAttempt);
       break;
     case 'next':
       nextRound();
@@ -844,6 +858,8 @@ function renderStatus(vm, players) {
       } else {
         sub = vm.demonstrator === uid ? 'Your turn to show the moves.' : 'Watch the robots move.';
       }
+      // Seconds left before a pause counts as giving up.
+      sub += ` <b class="idle">${Math.max(0, Math.ceil((vm.idleDeadline - backend.now()) / 1000))} s to move</b>`;
       break;
     }
     case 'done':
@@ -914,13 +930,7 @@ function renderAction(vm, players, game) {
           '</div>',
       );
     } else {
-      const p = players[vm.demonstrator];
-      const offline = !p || p.online === false;
-      const mark = offline
-        ? `<p class="hint">${esc(playerName(players, vm.demonstrator))} seems to be offline.</p>` +
-          `<button data-act="markfail">${S.confirm === 'markfail' ? 'Tap again to confirm' : 'Move on to the next caller'}</button>`
-        : '';
-      setHTML(el, `${count}${mark}`);
+      setHTML(el, count);
     }
     return;
   }
@@ -977,9 +987,10 @@ function renderCalls(vm, players) {
     if (vm.phase === 'done' && vm.winner === b.uid) {
       cls.push('active');
     }
+    const slow = vm.timedOut.includes(b.uid) ? '<span class="tag">ran out of time</span>' : '';
     return `<li class="${cls.join(' ')}"><span class="muted">${i + 1}.</span><span class="who">${esc(
       playerName(players, b.uid),
-    )}</span><span class="n">${b.n}</span></li>`;
+    )}</span>${slow}<span class="n">${b.n}</span></li>`;
   });
   setHTML($('#calls'), `<h3>Calls</h3><ol class="calls">${items.join('')}</ol>`);
 }
@@ -1047,12 +1058,21 @@ function renderScores(game, players) {
 function renderTimer(vm, now) {
   const bar = $('#timer-bar');
   let frac = 0;
+  let low = false;
+  let left = null;
   if (vm.phase === 'bidding') {
-    frac = Math.max(0, (vm.bidding.timerEnd - now) / vm.bidding.windowMs);
+    left = vm.bidding.timerEnd - now;
+    frac = Math.max(0, left / vm.bidding.windowMs);
+    low = vm.bidding.fast || left < 10000;
+  } else if (vm.phase === 'demo') {
+    // While someone shows their moves, the bar counts down the idle limit.
+    left = vm.idleDeadline - now;
+    frac = Math.max(0, left / IDLE_MS);
+    low = left < 3000;
   }
   bar.style.width = `${(frac * 100).toFixed(2)}%`;
-  bar.classList.toggle('low', vm.phase === 'bidding' && (vm.bidding.fast || vm.bidding.timerEnd - now < 10000));
-  const secs = vm.phase === 'bidding' ? Math.ceil((vm.bidding.timerEnd - now) / 1000) : null;
+  bar.classList.toggle('low', low);
+  const secs = left !== null ? Math.max(0, Math.ceil(left / 1000)) : null;
   document.title = secs !== null ? `${secs}s · Ricochet` : 'Ricochet';
 }
 
@@ -1099,6 +1119,47 @@ function path2d(d) {
     pathCache.set(d, new Path2D(d));
   }
   return pathCache.get(d);
+}
+
+// Robots are drawn as small figures: an antenna, a domed head with a
+// visor and two eyes, a body, and a base. No target symbol looks like that,
+// so a robot can't be mistaken for a target of the same color.
+// The paths live in a 20x20 box.
+const ROBOT_PARTS = [
+  'M9.3 3.4V1.9A1 1 0 1 1 10.7 1.9V3.4Z',
+  'M5.7 9.4V7.5A4.3 4.3 0 0 1 14.3 7.5V9.4Z',
+  'M6.9 9.4H13.1L15 15.6H5Z',
+  'M4.6 15.4H15.4Q16.6 15.4 16.6 16.6V17.6Q16.6 18.8 15.4 18.8H4.6Q3.4 18.8 3.4 17.6V16.6Q3.4 15.4 4.6 15.4Z',
+];
+const ROBOT_VISOR = 'M7.6 5.7H12.4Q13.5 5.7 13.5 6.8Q13.5 7.9 12.4 7.9H7.6Q6.5 7.9 6.5 6.8Q6.5 5.7 7.6 5.7Z';
+
+function drawRobot(cx, cy, c, fill, outline) {
+  const s = (c * 0.86) / 20;
+  ctx.save();
+  ctx.translate(cx - 10 * s, cy - 10.3 * s);
+  ctx.scale(s, s);
+  ctx.lineJoin = 'round';
+  // Outline first, then the fill on top, so the parts read as one figure.
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = 1.7;
+  for (const d of ROBOT_PARTS) {
+    ctx.stroke(path2d(d));
+  }
+  ctx.fillStyle = fill;
+  for (const d of ROBOT_PARTS) {
+    ctx.fill(path2d(d));
+  }
+  // A lighter band on the body gives it some depth.
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fill(path2d('M7.2 10.4H9.4L8.6 14.8H6Z'));
+  ctx.fillStyle = 'rgba(15,16,18,0.82)';
+  ctx.fill(path2d(ROBOT_VISOR));
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(8.6, 6.8, 0.72, 0, Math.PI * 2);
+  ctx.arc(11.4, 6.8, 0.72, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawSymbol(t, cx, cy, size, alpha) {
@@ -1452,29 +1513,19 @@ function draw(vm, game) {
     const cy = (r.y + 0.5) * c;
     if (open && i === targetIdx) {
       ctx.beginPath();
-      ctx.arc(cx, cy, c * 0.45, 0, Math.PI * 2);
+      ctx.arc(cx, cy, c * 0.47, 0, Math.PI * 2);
       ctx.strokeStyle = ROBOT_HEX[COLORS[i]];
       ctx.lineWidth = c * 0.07;
       ctx.stroke();
     }
     if (S.selected === i && canMove(vm)) {
       ctx.beginPath();
-      ctx.arc(cx, cy, c * 0.53, 0, Math.PI * 2);
+      ctx.arc(cx, cy, c * 0.56, 0, Math.PI * 2);
       ctx.strokeStyle = th.accent;
       ctx.lineWidth = c * 0.08;
       ctx.stroke();
     }
-    ctx.beginPath();
-    ctx.arc(cx, cy, c * 0.34, 0, Math.PI * 2);
-    ctx.fillStyle = ROBOT_HEX[COLORS[i]];
-    ctx.fill();
-    ctx.lineWidth = Math.max(1.5, c * 0.05);
-    ctx.strokeStyle = COLORS[i] === 'black' ? th.wall : 'rgba(0,0,0,0.55)';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx - c * 0.1, cy - c * 0.1, c * 0.09, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fill();
+    drawRobot(cx, cy, c, ROBOT_HEX[COLORS[i]], COLORS[i] === 'black' ? th.wall : 'rgba(0,0,0,0.7)');
   });
 
   // Rings going out from the target square and the target robot.

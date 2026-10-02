@@ -59,6 +59,62 @@ export function attemptKey(i) {
 // A call of MIN_CALL cannot be beaten, so it shortens the wait to this.
 export const FAST_MS = 5000;
 
+// Whoever is showing their moves must keep going. This long without a move
+// counts the same as giving up.
+export const IDLE_MS = 7000;
+
+// The player's own screen stops taking moves this long before the idle
+// limit, so a move sent at the last moment cannot arrive too late.
+export const IDLE_MARGIN_MS = 250;
+
+// What happened in one attempt to show a solution.
+//
+// Each attempt keeps a log of { m, t, end }: the moves after an action, the
+// server time of that action, and optionally how the attempt ended. The log
+// is replayed in server order, like the calls. An entry that arrives more
+// than IDLE_MS after the one before it came too late and is ignored, along
+// with everything after it. The clock for the first entry starts at
+// `startT`, when the attempt began.
+export function attemptView(attempt, startT, now) {
+  const a = attempt || {};
+  const entries = Object.entries(a.log || {})
+    .map(([key, e]) => ({ key, m: e.m || '', t: e.t, end: e.end || null }))
+    .filter((e) => typeof e.t === 'number')
+    .sort((x, y) => x.t - y.t || (x.key < y.key ? -1 : x.key > y.key ? 1 : 0));
+
+  let moves = '';
+  let last = startT;
+  let result = null;
+  let endT = null;
+
+  if (entries.length === 0 && a.result === 'fail') {
+    // Written by an older version of the game, which kept no log.
+    return { moves: a.moves || '', result: 'fail', endT: startT, deadline: startT, timedOut: false };
+  }
+
+  for (const e of entries) {
+    if (e.t > last + IDLE_MS) {
+      break;
+    }
+    moves = e.m;
+    last = e.t;
+    if (e.end) {
+      result = e.end;
+      endT = e.t;
+      break;
+    }
+  }
+
+  const deadline = last + IDLE_MS;
+  let timedOut = false;
+  if (!result && now >= deadline) {
+    result = 'fail';
+    endT = deadline;
+    timedOut = true;
+  }
+  return { moves, result, endT, deadline, timedOut };
+}
+
 // Upper bound on moves for someone with nobody behind them in line.
 export const SOLO_MAX_MOVES = 40;
 
@@ -201,6 +257,7 @@ export function deriveRound(game, now) {
     moves: '',
     winner: round.winner || null,
     failed: [],
+    timedOut: [],
   };
 
   if (round.winner) {
@@ -230,18 +287,29 @@ export function deriveRound(game, now) {
 
   // Timer has run out. Walk through the callers from lowest up, skipping
   // the ones who already failed.
+  // Each attempt starts when the one before it ended. The first starts
+  // when the timer ran out.
   const attempts = round.attempts || {};
   let i = 0;
-  while (attempts[attemptKey(i)] && attempts[attemptKey(i)].result === 'fail') {
+  let startT = bidding.timerEnd;
+  let a = null;
+  for (; i < bidding.order.length; i++) {
+    a = attemptView(attempts[attemptKey(i)], startT, now);
+    if (a.result !== 'fail') {
+      break;
+    }
     view.failed.push(bidding.order[i].uid);
-    i++;
+    if (a.timedOut) {
+      view.timedOut.push(bidding.order[i].uid);
+    }
+    startT = a.endT;
   }
   if (i >= bidding.order.length) {
     view.phase = 'done';
     return view;
   }
-  const a = attempts[attemptKey(i)] || {};
   view.phase = 'demo';
+  view.idleDeadline = a.deadline;
   // A single caller keeps the point even if they miscounted, so they are
   // not held to their number.
   view.solo = bidding.order.length === 1;
@@ -264,7 +332,7 @@ export function deriveRound(game, now) {
     view.limit = next ? Math.max(view.bid, next.n - 1) : SOLO_MAX_MOVES;
   }
   view.unlimited = view.limit === SOLO_MAX_MOVES;
-  view.moves = a.moves || '';
+  view.moves = a.moves;
   view.robots = applyMoves(board, start, view.moves);
   view.reached = robotOnTarget(view.robots, target);
   return view;
