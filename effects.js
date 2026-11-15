@@ -3,7 +3,10 @@
 // The shared data only says what happened, and every browser draws its own
 // celebration from that.
 
-import { pop, fanfare, nice as niceSound } from './sound.js';
+import { pop, fanfare, nice as niceSound, stupid as stupidSound, angry as angrySound } from './sound.js';
+import { REACTIONS } from './reactions.js';
+
+const SOUNDS = { nice: niceSound, stupid: stupidSound, angry: angrySound };
 
 const COLORS = ['#d8433b', '#2f9e55', '#2f6fd6', '#e2b21a', '#e87ba4', '#9085e9'];
 
@@ -179,24 +182,38 @@ export function celebrate(title, subtitle) {
   start();
 }
 
-// A thumbs up that pops up over the board and fades.
-export function showNice(name) {
-  niceSound();
+// A reaction that pops up over the board and fades: the emoji, the phrase
+// if the reaction has one, and who sent it.
+export function showReaction(key, name) {
+  const r = REACTIONS.find((x) => x.key === key);
+  if (!r) {
+    return;
+  }
+  if (SOUNDS[key]) {
+    SOUNDS[key]();
+  }
   const wrap = document.querySelector('.board-wrap');
   const el = document.createElement('div');
-  el.className = 'nice-pop';
+  el.className = `nice-pop react-${key}`;
   el.style.left = `${18 + Math.random() * 64}%`;
   el.style.top = `${28 + Math.random() * 40}%`;
-  const thumb = document.createElement('span');
-  thumb.className = 'thumb';
-  thumb.textContent = '\u{1F44D}';
+  const face = document.createElement('span');
+  face.className = 'thumb';
+  face.textContent = r.emoji;
+  el.append(face);
+  if (r.phrase) {
+    const phrase = document.createElement('span');
+    phrase.className = 'phrase';
+    phrase.textContent = r.phrase;
+    el.append(phrase);
+  }
   const who = document.createElement('span');
   who.className = 'by';
   who.textContent = name;
-  el.append(thumb, who);
+  el.append(who);
   wrap.appendChild(el);
   const remove = () => el.remove();
   el.addEventListener('animationend', remove);
   // In case animations are turned off.
-  setTimeout(remove, 2600);
+  setTimeout(remove, 3200);
 }

@@ -104,10 +104,18 @@ player's own screen and scaled to its size, so a phone gets fewer and smaller
 pieces. If your device is set to reduce motion, you only get the name. Tap the
 name to close it.
 
-### Nice
+### Reactions
 
-The **Nice** button beside the chat sends a thumbs up to everyone. It pops up
-over the board and fades. You can send one per round.
+Three buttons beside the chat send a quick reaction to everyone. Each one pops
+up over the board with the sender's name, plays a short sound, and fades.
+
+- **Nice** shows a thumbs up.
+- **I am stupid** shows a facepalm with the phrase under it.
+- The **angry face** shakes as it appears.
+
+You can send each one once per round. To add another reaction, add an entry
+to `reactions.js`, a sound to `sound.js`, and its key to
+`database.rules.json`.
 
 ### Statistics
 
@@ -259,6 +267,7 @@ Then open `http://localhost:8000/?local&timer=10` in two or more tabs. The
 | `stats-view.js` | Draws the statistics page and its charts |
 | `effects.js` | Confetti, poppers, the winner's name, and the thumbs up |
 | `sound.js` | Placeholder sounds |
+| `reactions.js` | The list of reactions and their buttons |
 | `backend-firebase.js` | Firebase Realtime Database connection |
 | `backend-local.js` | Local test mode that stores data in the browser |
 | `config.js` | Your Firebase settings |

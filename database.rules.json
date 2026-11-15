@@ -54,6 +54,16 @@
               },
               "started": {
                 ".validate": "newData.val() == now"
+              },
+              "stupid": {
+                "$uid": {
+                  ".validate": "!data.exists() && newData.val() == now"
+                }
+              },
+              "angry": {
+                "$uid": {
+                  ".validate": "!data.exists() && newData.val() == now"
+                }
               }
             }
           }

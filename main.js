@@ -35,7 +35,8 @@ import {
   IDLE_MARGIN_MS,
 } from './game.js';
 import { beep } from './sound.js';
-import { celebrate, showNice } from './effects.js';
+import { celebrate, showReaction } from './effects.js';
+import { REACTIONS } from './reactions.js';
 import { gameStats } from './stats.js';
 import { renderStats, attachTooltips } from './stats-view.js';
 
@@ -753,36 +754,58 @@ function maybeCelebrate(game, players) {
   celebrate(title, `${best} token${best === 1 ? '' : 's'} on this board`);
 }
 
-// One Nice per player per round. It is stored with the round, so it goes
-// away with the board.
-function sendNice() {
+// Reactions: each player can send each kind once per round. They are stored
+// with the round, so they go away with the board.
+
+// One button per reaction, built from the list in reactions.js.
+$('#react-btns').innerHTML = REACTIONS.map(
+  (r) =>
+    `<button class="small" type="button" data-react="${r.key}" title="${esc(r.title)}" aria-label="${esc(
+      r.button || r.title,
+    )}">${r.emoji}${r.button ? ` ${esc(r.button)}` : ''}</button>`,
+).join('');
+
+function sendReaction(key) {
   const vm = fresh();
-  if (!vm || (vm.round.nice && vm.round.nice[uid])) {
+  if (!vm || (vm.round[key] && vm.round[key][uid])) {
     return;
   }
-  backend.set(`${roundPath(vm)}/nice/${uid}`, backend.TS);
+  backend.set(`${roundPath(vm)}/${key}/${uid}`, backend.TS);
 }
 
-function showNewNices(vm, game, players) {
-  S.seenNice = S.seenNice || new Set();
-  for (const [id, t] of Object.entries(vm.round.nice || {})) {
-    const key = `${game.id}:${vm.n}:${id}`;
-    if (S.seenNice.has(key)) {
-      continue;
-    }
-    S.seenNice.add(key);
-    // Skip the ones sent before this player opened the room.
-    if (typeof t === 'number' && t >= S.joinedAt - 1000) {
-      showNice(playerName(players, id));
+function showNewReactions(vm, game, players) {
+  S.seenReact = S.seenReact || new Set();
+  // Show them in the order they were sent.
+  const incoming = [];
+  for (const r of REACTIONS) {
+    for (const [id, t] of Object.entries(vm.round[r.key] || {})) {
+      const seen = `${game.id}:${vm.n}:${r.key}:${id}`;
+      if (S.seenReact.has(seen)) {
+        continue;
+      }
+      S.seenReact.add(seen);
+      // Skip the ones sent before this player opened the room.
+      if (typeof t === 'number' && t >= S.joinedAt - 1000) {
+        incoming.push({ key: r.key, id, t });
+      }
     }
   }
-  const btn = $('#nice-btn');
-  const sent = !!(vm.round.nice && vm.round.nice[uid]);
-  btn.disabled = sent;
-  btn.title = sent ? 'You already sent a Nice this round' : 'Send a thumbs up to everyone';
+  incoming.sort((a, b) => a.t - b.t).forEach((f) => showReaction(f.key, playerName(players, f.id)));
+
+  for (const r of REACTIONS) {
+    const btn = document.querySelector(`[data-react="${r.key}"]`);
+    const sent = !!(vm.round[r.key] && vm.round[r.key][uid]);
+    btn.disabled = sent;
+    btn.title = sent ? 'You already sent this one this round' : r.title;
+  }
 }
 
-$('#nice-btn').addEventListener('click', sendNice);
+$('#react-btns').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-react]');
+  if (b && !b.disabled) {
+    sendReaction(b.dataset.react);
+  }
+});
 
 $('#stats-btn').addEventListener('click', () => {
   S.showStats = !S.showStats;
@@ -889,7 +912,7 @@ function render() {
     S.selected = null;
   }
 
-  showNewNices(vm, game, players);
+  showNewReactions(vm, game, players);
   if (vm.phase === 'done' && !nextRoundFor(game, vm)) {
     maybeCelebrate(game, players);
   }

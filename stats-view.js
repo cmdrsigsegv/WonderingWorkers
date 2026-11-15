@@ -247,8 +247,24 @@ export function renderStats(stats, players, narrow) {
       }.`,
     );
   }
+  const reacts = [];
   if (t.nices) {
-    notes.push(`<b>${t.nices}</b> ${t.nices === 1 ? 'Nice was' : 'Nices were'} sent.`);
+    reacts.push(`<b>${t.nices}</b> ${t.nices === 1 ? 'Nice' : 'Nices'}`);
+  }
+  if (t.stupids) {
+    reacts.push(`<b>${t.stupids}</b> ${t.stupids === 1 ? 'facepalm' : 'facepalms'}`);
+  }
+  if (t.angries) {
+    reacts.push(`<b>${t.angries}</b> angry ${t.angries === 1 ? 'face' : 'faces'}`);
+  }
+  if (reacts.length) {
+    let list = reacts[0];
+    if (reacts.length === 2) {
+      list = `${reacts[0]} and ${reacts[1]}`;
+    } else if (reacts.length === 3) {
+      list = `${reacts[0]}, ${reacts[1]}, and ${reacts[2]}`;
+    }
+    notes.push(`Reactions sent: ${list}.`);
   }
 
   const playerRows = [...stats.players]
@@ -259,7 +275,7 @@ export function renderStats(stats, players, narrow) {
           p.lowestCalls
         }</td><td>${num(p.avgCall)}</td><td>${secs(p.medianDelayMs)}</td><td>${p.exact}</td><td>${p.gaveUp}</td><td>${
           p.timeouts
-        }</td><td>${p.nices}</td></tr>`,
+        }</td><td>${p.nices}</td><td>${p.stupids}</td><td>${p.angries}</td></tr>`,
     )
     .join('');
 
@@ -302,7 +318,7 @@ export function renderStats(stats, players, narrow) {
     '<section class="viz-card"><h3>Players</h3><div class="scroll"><table>' +
     '<thead><tr><th scope="col">Player</th><th scope="col">Tokens</th><th scope="col">Calls</th><th scope="col">Called first</th>' +
     '<th scope="col">Lowest call</th><th scope="col">Average call</th><th scope="col">Median delay</th><th scope="col">Exact</th>' +
-    '<th scope="col">Gave up</th><th scope="col">Timed out</th><th scope="col">Nices sent</th></tr></thead>' +
+    '<th scope="col">Gave up</th><th scope="col">Timed out</th><th scope="col">Nices</th><th scope="col">Facepalms</th><th scope="col">Angry</th></tr></thead>' +
     `<tbody>${playerRows}</tbody></table></div>` +
     '<p class="sub">Median delay is how long after the round\'s first call the player usually called, in rounds where someone else was first. Exact counts wins that used exactly the number called.</p></section>' +
     '<section class="viz-card"><h3>Rounds</h3><div class="scroll"><table>' +

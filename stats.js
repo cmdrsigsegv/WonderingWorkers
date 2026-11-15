@@ -104,6 +104,8 @@ export function gameStats(game, now) {
         gaveUp: 0,
         timeouts: 0,
         nices: 0,
+        stupids: 0,
+        angries: 0,
         delays: [],
         points: [],
       });
@@ -119,6 +121,12 @@ export function gameStats(game, now) {
 
     Object.keys(round.nice || {}).forEach((uid) => {
       player(uid).nices += 1;
+    });
+    Object.keys(round.stupid || {}).forEach((uid) => {
+      player(uid).stupids += 1;
+    });
+    Object.keys(round.angry || {}).forEach((uid) => {
+      player(uid).angries += 1;
     });
 
     if (bidding.order.length === 0) {
@@ -260,6 +268,8 @@ export function gameStats(game, now) {
       fives: rounds.reduce((s, r) => s + r.calls.filter((c) => c.n === MIN_CALL).length, 0),
       timeouts: playerList.reduce((s, p) => s + p.timeouts, 0),
       nices: playerList.reduce((s, p) => s + p.nices, 0),
+      stupids: playerList.reduce((s, p) => s + p.stupids, 0),
+      angries: playerList.reduce((s, p) => s + p.angries, 0),
       closest,
       longest,
     },

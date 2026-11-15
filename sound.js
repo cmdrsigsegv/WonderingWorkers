@@ -73,3 +73,36 @@ export function nice() {
   tone(660, 0, 0.09, 0.07, 'triangle');
   tone(990, 0.08, 0.14, 0.07, 'triangle');
 }
+
+// A sad falling "wah wah wah" for "I am stupid".
+export function stupid() {
+  [392, 370, 349].forEach((f, i) => tone(f, i * 0.22, 0.24, 0.06, 'sawtooth'));
+  tone(330, 0.66, 0.6, 0.06, 'sawtooth');
+}
+
+// A short low growl for the angry face.
+export function angry() {
+  const a = ctx();
+  if (!a) {
+    return;
+  }
+  const o = a.createOscillator();
+  const wobble = a.createOscillator();
+  const depth = a.createGain();
+  const g = a.createGain();
+  const t0 = a.currentTime;
+  o.type = 'sawtooth';
+  o.frequency.value = 95;
+  // A fast wobble in pitch makes it sound like a growl.
+  wobble.frequency.value = 28;
+  depth.gain.value = 18;
+  wobble.connect(depth).connect(o.frequency);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.09, t0 + 0.04);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+  o.connect(g).connect(a.destination);
+  o.start(t0);
+  wobble.start(t0);
+  o.stop(t0 + 0.46);
+  wobble.stop(t0 + 0.46);
+}

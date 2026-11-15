@@ -552,6 +552,49 @@ button.link {
   line-height: 1;
 }
 
+.nice-pop .phrase {
+  margin-top: 2px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* The angry face shakes as it appears. */
+.nice-pop.react-angry {
+  animation: nice-pop 2.2s ease-out forwards, angry-shake 0.5s ease-in-out 0.25s 2;
+}
+
+/* The facepalm stays up a little longer, so the phrase can be read. */
+.nice-pop.react-stupid {
+  animation-duration: 2.8s;
+}
+
+@keyframes angry-shake {
+  0%,
+  100% {
+    margin-left: 0;
+  }
+  20%,
+  60% {
+    margin-left: -8px;
+  }
+  40%,
+  80% {
+    margin-left: 8px;
+  }
+}
+
+.reactions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .nice-pop .by {
   margin-top: 2px;
   padding: 1px 8px;
@@ -588,8 +631,10 @@ button.link {
     animation: none;
   }
 
-  .nice-pop {
-    animation: nice-fade 2.2s linear forwards;
+  .nice-pop,
+  .nice-pop.react-angry,
+  .nice-pop.react-stupid {
+    animation: nice-fade 2.6s linear forwards;
   }
 
   @keyframes nice-fade {
